@@ -1,0 +1,25 @@
+docker/tempo/tempo-data/
+*.sh
+
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+.run
+*.ipr
+*.tmdl
+changes.txt
+
+# Other files and folders
+.settings/
+
+# Executables
+*.swf
+*.air
+*.ipa
+*.apk
