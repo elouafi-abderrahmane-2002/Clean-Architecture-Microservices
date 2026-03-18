@@ -1,322 +1,308 @@
-# LMS Microservices
+# 🏗️ Clean Architecture Microservices — Java 21 / Spring Boot 4
 
-## Clean Architecture with Spring Boot 4
-
-## Overview
-
-This codebase is designed for Java backend developers interested in a **Microservices** application
-following on **Clean Architecture** and **SOLID** principles, built with **Spring Boot 4**, **Java
-25**, and **Spring Framework 7**.
+Construire une application en microservices, c'est facile. Construire une
+application en microservices qui reste maintenable, testable et évolutive
+six mois plus tard — c'est une autre histoire. Ce projet applique la Clean
+Architecture à une architecture microservices complète, avec Spring Boot 4,
+Kafka, Eureka et une observabilité complète (Grafana/Loki/Tempo).
 
 ---
 
-## Quick Info
-
-![Java](https://img.shields.io/badge/java-25-brightgreen)
-![SpringBoot](https://img.shields.io/badge/spring--boot-4.0.3-brightgreen)
-![Maven](https://img.shields.io/badge/Maven-3.9.12-blue)
-
-![Coverage](https://img.shields.io/badge/jacoco%20coverage-75%25-yellow)
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-
-![License](https://img.shields.io/badge/license-MIT-brightgreen)
-![Last Commit](https://img.shields.io/github/last-commit/arivan-amin/Spring-Clean-Microservices)
-![Repo Size](https://img.shields.io/github/repo-size/arivan-amin/Spring-Clean-Microservices)
-![Contributors](https://img.shields.io/github/contributors/arivan-amin/Spring-Clean-Microservices)
-
-## Services Overview
-
-![image](https://raw.githubusercontent.com/arivan-amin/Clean-Architecture-Microservices/master/Docs/Diagram/Architecture-Diagram.jpg)
-
-## Technologies used and their responsibility
-
-- **Java 25**
-- **Spring Boot 4**
-- **Spring Cloud 2025.1**
-- **MySQL 9.5**: Services data storage.
-- **Kafka 4.1**: Event streaming for microservices.
-- **Docker**
-- **Eureka**: Dynamic service registry.
-- **Grafana, Loki, Tempo**: Observability stack for metrics, logging, and tracing.
-- **JUnit & Mockito**: Unit testing and Mocking.
-- **ArchUnit**: Architecture boundaries testing and coding standards validation.
-- **PMD**: Validate coding standards and best practices.
-- **Pitest**: Mutation testing.
-- **Swagger/OpenAPI**: API documentation.
-- **Liquibase**: Database Migrations.
-- **Lombok**: Cleaner code with reduced boilerplate.
-
----
-
-## Architecture concepts and technical features demonstrated and implemented
-
-- **Microservices Architecture**.
-- **Clean Architecture & Clean Code**
-- **Command-Query Responsibility Separation (CQRS)**
-- **SOLID Principles**
-- **Mutation Testing**
-- **Spring Dependency Injection**
-- **Aspect-Oriented Programming (AOP)**
-- **Rate Limiting API**
-- **Automatic Audit Logs recording**: Uses Spring AOP to store audit logs automatically.
-- **Event-Driven Communication**: Using Kafka.
-- **Robust Monitoring**: Real-time monitoring with Grafana, Loki, and Tempo.
-- **Centralized Logging & Distributed Tracing**: Using Loki and Tempo.
-- **Database Migrations**: Using Liquibase.
-- **Dockerized Deployment**: Using Docker and Docker Compose.
-
----
-
-## Clean Architecture Implementation Layers
-
-Services in this app implement strict architectural boundaries enforced by ArchUnit rules that
-cause failing unit tests when violated.
-In each service, there are 3 layers:
-
-### Domain
-
-- contains only business logic, entities, command/queries.
-- Persistence(JDBC, JPA, NoSQL) or Spring code is not allowed in this layer.
-- This is the innermost layer; it shouldn't know anything about the other layers.
-- Any access or references to classes in the other 2 layers will cause unit test failure.
-
-### Storage
-
-- Contains only classes related to data persistence, JPA, JDBC, or any other data storing mechanism
-  that belong to this layer.
-- Only calls to persistence classes are allowed.
-- Spring configs and web classes don't belong here.
-- This is the second inner layer; it can access the Domain layer.
-- Any access or references to classes in the Application layer will cause unit test failure.
-
-### Application
-
-- Spring beans, web classes live here.
-- It can access both previous layers since this is the most outward layer.
-
----
-
-## Notable Features
-
-### Automatic Audit Logs Recording
-
-Use Spring **AOP** to create Audit Events automatically whenever any API in any of the services is
-called and saved to persistence, allowing the controllers to be clutter-free.
-
-### Clean Restful API in all services
-
-The API follows the modern best practices in RESTful services recommendations,
-like using **ResponseEntity** and returning **ProblemDetail**.
-
-### CQRS
-
-Command and Query Separation Principle to implement Business logic.
-
-### Rate Limiting
-
-Implemented in **API Gateway** using **Redis Rate Limiter**.
-
-### Outbox Pattern
-
-Implements the Outbox Pattern for sending audit events to guarantee 100% message delivery.
-
-### ArchUnit
-
-Validate architectural boundaries and verify adherence to best coding standards.
-
-### PMD and Pitest
-
-Use PMD to verify the coding style and Pitest for mutation testing.
-
-### RestControllerAdvice
-
-Handle specific exceptions and return a unified and standard error response instead of an exception
-stack trace using Spring **ProblemDetail**.
-Example of API response for every error.
+## Architecture globale
 
 ```
-{
-    "type": "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/RuntimeException.html",
-    "title": "Requested Student Not Found",
-    "status": 404,
-    "detail": "Student by the requested id not found",
-    "instance": "/students/protected/v1/accounts/33bff7c7-77ee-4c51-9ee0-c870b437f82e",
-    "category": "Resource Not Found",
-    "timestamp": "2025-04-22T18:45:43.927431130Z"
+  Client (API Gateway)
+          │
+          ▼
+  ┌───────────────────────────────────────────────────────────┐
+  │                    API Gateway (Spring Cloud)             │
+  │         Routing + Auth JWT + Rate Limiting                │
+  └───┬──────────────┬───────────────┬───────────────────────┘
+      │              │               │
+      ▼              ▼               ▼
+  ┌────────┐   ┌──────────┐   ┌───────────┐
+  │ Order  │   │Inventory │   │Notification│
+  │Service │   │Service   │   │Service    │
+  │        │   │          │   │           │
+  │Port:8081│  │Port:8082 │   │Port:8083  │
+  └────┬───┘   └────┬─────┘   └─────┬─────┘
+       │             │               │
+       └─────────────┼───────────────┘
+                     │  Kafka Topics
+                     ▼
+             ┌───────────────┐
+             │ Apache Kafka  │
+             │ order-placed  │
+             │ order-updated │
+             └───────────────┘
+
+  Service Discovery : Eureka Server (tous les services s'y enregistrent)
+  Config centralisé : Spring Cloud Config Server
+  Observabilité     : Grafana + Loki (logs) + Tempo (traces)
+```
+
+---
+
+## Structure Clean Architecture par service
+
+```
+  order-service/
+  └── src/main/java/
+      └── com/viseo/order/
+          │
+          ├── domain/                  ← CORE — zéro dépendance externe
+          │   ├── model/
+          │   │   └── Order.java       ← entité domain pure
+          │   ├── port/
+          │   │   ├── in/              ← interfaces use cases (driven)
+          │   │   │   └── PlaceOrderUseCase.java
+          │   │   └── out/             ← interfaces infrastructure (driver)
+          │   │       ├── OrderRepository.java
+          │   │       └── OrderEventPublisher.java
+          │   └── exception/
+          │       └── OrderNotFoundException.java
+          │
+          ├── application/             ← USE CASES — orchestration métier
+          │   └── service/
+          │       └── OrderService.java  ← implémente PlaceOrderUseCase
+          │
+          └── infrastructure/          ← ADAPTERS — détails techniques
+              ├── web/
+              │   └── OrderController.java   ← entrée HTTP
+              ├── persistence/
+              │   └── JpaOrderRepository.java ← implémente OrderRepository
+              └── messaging/
+                  └── KafkaOrderPublisher.java ← implémente OrderEventPublisher
+```
+
+---
+
+## Entité Domain — pure, sans annotation Spring
+
+```java
+// domain/model/Order.java
+package com.viseo.order.domain.model;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
+
+public final class Order {
+
+    private final OrderId    id;
+    private final CustomerId customerId;
+    private OrderStatus      status;
+    private final BigDecimal amount;
+    private final Instant    createdAt;
+
+    private Order(OrderId id, CustomerId customerId, BigDecimal amount) {
+        this.id         = id;
+        this.customerId = customerId;
+        this.amount     = amount;
+        this.status     = OrderStatus.PENDING;
+        this.createdAt  = Instant.now();
+    }
+
+    // Factory method — validation centralisée
+    public static Order create(CustomerId customerId, BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Order amount must be positive");
+        }
+        return new Order(OrderId.generate(), customerId, amount);
+    }
+
+    public void confirm() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new IllegalStateException("Only PENDING orders can be confirmed");
+        }
+        this.status = OrderStatus.CONFIRMED;
+    }
+
+    public void cancel() {
+        if (this.status == OrderStatus.SHIPPED) {
+            throw new IllegalStateException("Cannot cancel a shipped order");
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
+    // Getters — pas de setters publics, état contrôlé par les méthodes métier
+    public OrderId    getId()         { return id; }
+    public OrderStatus getStatus()    { return status; }
+    public BigDecimal getAmount()     { return amount; }
+    public Instant    getCreatedAt()  { return createdAt; }
 }
 ```
 
-### OpenAPI and Swagger Docs
+---
 
-Provides detailed documentation for all endpoints.
+## Port (interface) — découplage total de l'infrastructure
 
-### Entity and DTO separation
+```java
+// domain/port/in/PlaceOrderUseCase.java
+public interface PlaceOrderUseCase {
+    OrderId placeOrder(PlaceOrderCommand command);
+}
 
-Decouples core business logic from presentation using request and response POJO.
+// domain/port/out/OrderRepository.java
+public interface OrderRepository {
+    void save(Order order);
+    Optional<Order> findById(OrderId id);
+    List<Order> findByCustomerId(CustomerId customerId);
+}
 
-### Domain Entity and JPA separation
-
-Domain entities have no association with JPA and are never annotated with @Entity.
-
-## Sample audit log from Audit-Service captured from API calls in Student-Service
-
-```
-        // Create Student Endpoint
-        {
-            "id": "6797e0215829937787277607",
-            "serviceName": "student-service",
-            "location": "/students/protected/v1/accounts",
-            "action": "Create",
-            "data": "CreateStudentRequest(firstName=Hayden, lastName=Ondricka, email=Helen21@gmail.com, dateOfBirth=977659882000, gender=MALE, address=Bernhard Cape)",
-            "creationDate": "2025-01-27T14:36:01.528",
-            "duration": "50ms",
-            "response": "CreateStudentResponse(id=9622e5ef-5ab7-4faf-89db-7dd970ea8ef0)"
-        }
-
-        // Delete Student Endpoint
-        {
-            "id": "6797e0115829937787277605",
-            "serviceName": "student-service",
-            "location": "/students/protected/v1/accounts/{id}",
-            "action": "Delete",
-            "data": "e8cd23d1-4bad-44bb-9b58-a3ca89dbf793",
-            "creationDate": "2025-01-27T14:35:45.631",
-            "duration": "25ms",
-            "response": "Void"
-        },
-        
-        // Read Student by ID Endpoint
-        {
-            "id": "6797e0145829937787277606",
-            "serviceName": "student-service",
-            "location": "/students/protected/v1/accounts/{id}",
-            "action": "Read",
-            "data": "e8cd23d1-4bad-44bb-9b58-a3ca89dbf793",
-            "creationDate": "2025-01-27T14:35:48.66",
-            "duration": "14ms",
-            "response": "Error: Student by the requested id not found"
-        }
+// domain/port/out/OrderEventPublisher.java
+public interface OrderEventPublisher {
+    void publishOrderPlaced(OrderPlacedEvent event);
+}
 ```
 
-### Currently, the following services are implemented; other services will be added:
+---
 
-- Discovery Server
-- API Gateway
-- Student Service
-- Audit Service
+## Use Case — Application Service
+
+```java
+// application/service/OrderService.java
+@Service
+@Transactional
+public class OrderService implements PlaceOrderUseCase {
+
+    private final OrderRepository    repository;
+    private final InventoryPort      inventory;
+    private final OrderEventPublisher publisher;
+
+    public OrderService(OrderRepository repository,
+                        InventoryPort inventory,
+                        OrderEventPublisher publisher) {
+        this.repository = repository;
+        this.inventory  = inventory;
+        this.publisher  = publisher;
+    }
+
+    @Override
+    public OrderId placeOrder(PlaceOrderCommand command) {
+        // 1. Vérifier le stock
+        boolean inStock = inventory.isInStock(
+            command.getProductId(), command.getQuantity()
+        );
+        if (!inStock) {
+            throw new OutOfStockException(command.getProductId());
+        }
+
+        // 2. Créer l'entité domain
+        Order order = Order.create(
+            command.getCustomerId(),
+            command.getAmount()
+        );
+
+        // 3. Persister
+        repository.save(order);
+
+        // 4. Publier l'événement Kafka
+        publisher.publishOrderPlaced(
+            new OrderPlacedEvent(order.getId(), command.getProductId())
+        );
+
+        return order.getId();
+    }
+}
+```
 
 ---
 
-## Grafana Monitoring Sample
+## Communication async via Kafka
 
-![image](https://raw.githubusercontent.com/arivan-amin/Clean-Architecture-Microservices/master/Docs/Grafana/Grafana-Dashboard-1.png)
+```java
+// infrastructure/messaging/KafkaOrderPublisher.java
+@Component
+public class KafkaOrderPublisher implements OrderEventPublisher {
 
-## Installation Guide
+    private static final String TOPIC = "order-placed";
+    private final KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate;
 
-### Prerequisites
+    @Override
+    public void publishOrderPlaced(OrderPlacedEvent event) {
+        kafkaTemplate.send(TOPIC, event.getOrderId().value(), event)
+            .whenComplete((result, ex) -> {
+                if (ex != null) {
+                    log.error("Failed to publish event: {}", ex.getMessage());
+                } else {
+                    log.info("Event published: {} offset={}",
+                        event.getOrderId(),
+                        result.getRecordMetadata().offset());
+                }
+            });
+    }
+}
 
-- **Java 25**
-- **Maven**
-- **Docker** & **Docker Compose**
-
----
-
-### Steps to Get Started
-
-1. **Clone the Repository:**
-   ```
-   git clone https://github.com/arivan-amin/Clean-Architecture-Microservices.git
-   cd Spring-Clean-Microservices
-   ```
-
-2. **Build and deploy the services to Docker using JIB:**
-   ```
-   mvn clean install
-   ```
-
-3. **Set Environment Variables (Linux/MacOS):**
-   ```
-   export EUREKA_USERNAME=admin
-   export EUREKA_PASSWORD=admin
-   ```
-   ```
-   *(For Windows, use `set` command)*
-   ```
-
-4. **Start the required backbone apps with Docker Compose:**
-   ```
-   docker compose up -d
-   ```
-5. **Start the services(Students, Audit, ...) manually or uncomment the section in docker compose
-   file
-   to run everything with Docker Compose:**
-   ```
-   docker compose up -d
-   ```
-
-# Access the Services
-
-## API Gateway
-
-[http://localhost:8080](http://localhost:8080)
-
-## Eureka Dashboard
-
-#### Username: admin
-
-#### Password: admin
-
-[http://localhost:8080/eureka/web](http://localhost:8080/eureka/web)
-
-## API Documentation
-
-[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-
-## Grafana Dashboard
-
-#### Import pre-built dashboard JSON configuration from the `docker/grafana/` folder
-
-[http://localhost:3000/dashboards](http://localhost:3000/dashboards)
+// Notification Service consomme les événements
+@KafkaListener(topics = "order-placed", groupId = "notification-service")
+public void handleOrderPlaced(OrderPlacedEvent event) {
+    log.info("Received order placed event: {}", event.getOrderId());
+    emailService.sendOrderConfirmation(event);
+}
+```
 
 ---
 
-## Testing
+## Tests unitaires — Use Case isolé
 
-- **Run Unit and Integration Tests:**
-   ```bash
-   mvn test
-   ```
+```java
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock OrderRepository    repository;
+    @Mock InventoryPort      inventory;
+    @Mock OrderEventPublisher publisher;
+
+    @InjectMocks OrderService orderService;
+
+    @Test
+    void placeOrder_shouldCreateAndPublishEvent_whenInStock() {
+        // Arrange
+        var command = new PlaceOrderCommand(
+            CustomerId.of("cust-1"),
+            ProductId.of("prod-1"),
+            2,
+            new BigDecimal("99.99")
+        );
+        when(inventory.isInStock(any(), anyInt())).thenReturn(true);
+
+        // Act
+        OrderId orderId = orderService.placeOrder(command);
+
+        // Assert
+        assertNotNull(orderId);
+        verify(repository, times(1)).save(any(Order.class));
+        verify(publisher, times(1)).publishOrderPlaced(any());
+    }
+
+    @Test
+    void placeOrder_shouldThrowException_whenOutOfStock() {
+        when(inventory.isInStock(any(), anyInt())).thenReturn(false);
+
+        assertThrows(OutOfStockException.class,
+            () -> orderService.placeOrder(buildCommand()));
+
+        verify(repository, never()).save(any());
+        verify(publisher, never()).publishOrderPlaced(any());
+    }
+}
+```
 
 ---
 
-## Microservices Overview
+## Ce que j'ai appris
 
-- **Discovery Server**: Dynamic service discovery and registry.
-- **API Gateway**: Centralized entry point for routing and security.
-- **Core Module**: Shared utilities and functionality.
-- **Outbox Storage Module**: Contains classes related to outbox message storage, shared with
-  all the modules.
-- **Student Service**: Manages student data.
-- **Audit Service**: Stores Audit Events, ensures compliance, and data integrity.
+Les ports (interfaces) dans la couche Domain ne sont pas du code en plus —
+ce sont ce qui rend les tests rapides et fiables. Sans eux, tester
+`OrderService` nécessite une vraie base de données et un vrai Kafka.
+Avec eux, on mock tout en deux lignes et le test tourne en millisecondes.
 
----
-
-## Contributing
-
-We welcome contributions! Fork the repository, create a new branch, and submit a pull request.
+C'est aussi ce qui permet de changer l'implémentation sans toucher
+au métier : passer de PostgreSQL à MongoDB, de Kafka à RabbitMQ —
+le Domain ne sait pas, ne s'en soucie pas.
 
 ---
 
-## License
-
-This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for more
-details.
-
----
-
-## Contact
-
-For questions or inquiries:
-
-- **Name:** Arivan Amin
-- **Email:** [arivanamin@gmail.com](mailto:arivanamin@gmail.com)
+*Projet réalisé dans le cadre de ma formation ingénieur — ENSET Mohammedia*
+*Par **Abderrahmane Elouafi** · [LinkedIn](https://www.linkedin.com/in/abderrahmane-elouafi-43226736b/) · [Portfolio](https://my-first-porfolio-six.vercel.app/)*
